@@ -27,6 +27,8 @@
 // set to 0 when done debugging program
 #define TEST 1
 
+char *getHost();
+
 // returns server IP address (localhost) and listening port from command line
 // returns as array of strings
 // listening port = argv[1] (needs atoi())
@@ -39,7 +41,7 @@ char **getPort(int argc, char *argv[])
 	}
 	char **server_addr = NULL;
 	server_addr = (char **)calloc((size_t)2, sizeof(char *));
-	server_addr[0] = "localhost";
+	server_addr[0] = getHost();
 	server_addr[1] = argv[1];
 #if TEST
 	fprintf(stderr, "[DEBUG] Server: %s\tPort: %d\n", server_addr[0], atoi(server_addr[1]));
@@ -50,7 +52,7 @@ char **getPort(int argc, char *argv[])
 // code sourced from web archive of:
 // http://guy-lecky-thompson.suite101.com/socket-programming-gethostbyname-a19557
 // gets host by hostname and retrieves ip address from hostname
-void getHost(char *server_addr)
+char *getHost()
 {
     char hostname[255];
     gethostname(hostname, 255);
@@ -58,7 +60,7 @@ void getHost(char *server_addr)
     host_entry = gethostbyname(hostname);
     char *localip;
     localip = inet_ntoa(*(struct in_addr *)*host_entry->h_addr_list);
-    fprintf(stderr, "[ftserver] Server listening at: %s:%d\n", localip, atoi(server_addr));
+    return localip;
 }
 
 // creates endpoint for network communication on listening port
@@ -87,7 +89,10 @@ int createSocket(int argc, char *argv[])
 		exit(1);
 	}
     // listen on port
-    listen(sockfd, 1);
+    if(listen(sockfd, 1) == -1)
+    {
+        fprintf(stderr, "ftserver] ERROR! did not begin listening\n");
+    }
     getHost(server_addr[1]);
 	return sockfd;
 }
@@ -96,9 +101,11 @@ int createSocket(int argc, char *argv[])
 // returns received data as string or NULL if no message received
 char *readCommand(int newsockfd)
 {
+    int readResult;
 	char *clientCommand = NULL;
 	clientCommand = (char *)calloc(128, sizeof(char));
-	if(read(newsockfd, &clientCommand, 128) <= 0)
+	readResult = read(newsockfd, &clientCommand, 128);
+    if(readResult < 0)
 	{
 		return NULL;
 	}
