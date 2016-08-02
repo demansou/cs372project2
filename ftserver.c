@@ -103,8 +103,8 @@ char *readCommand(int newsockfd)
 {
     int readResult;
 	char *clientCommand = NULL;
-	clientCommand = (char *)calloc(128, sizeof(char));
-	readResult = read(newsockfd, &clientCommand, 128);
+	clientCommand = (char *)calloc((size_t)3, sizeof(char));
+	readResult = read(newsockfd, clientCommand, (size_t)3);
     if(readResult < 0)
 	{
 		return NULL;
