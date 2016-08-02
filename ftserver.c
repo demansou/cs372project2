@@ -20,9 +20,9 @@
 #include <unistd.h> // for read(), write(), and close()
 #include <strings.h> // for bzero() (legacy BSD functions)
 #include <ifaddrs.h> // for getifaddrs()
-#include <string.h>
-#include <netdb.h>
-#include <arpa/inet.h>
+//#include <string.h>
+#include <netdb.h> // used for struct in_addr
+#include <arpa/inet.h> // used for inet_ntoa()
 
 // set to 0 when done debugging program
 #define TEST 1
@@ -49,6 +49,7 @@ char **getPort(int argc, char *argv[])
 
 // code sourced from web archive of:
 // http://guy-lecky-thompson.suite101.com/socket-programming-gethostbyname-a19557
+// gets host by hostname and retrieves ip address from hostname
 void getHost(char *server_addr)
 {
     char hostname[255];
