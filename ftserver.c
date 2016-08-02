@@ -14,9 +14,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/socket.h> // for socklen_t
-#include <sys/types.h> // for size_t
+#include <sys/types.h> // for size_t, getifaddrs()
 #include <netinet/in.h> // for struct sockaddr_in
 #include <unistd.h> // for read(), write(), and close()
+#include <strings.h> // for bzero() (legacy BSD functions)
+#include <ifaddrs.h> // for getifaddrs()
+
+// get definitions of NI_MAXSERV and NI_MAXHOST
+#define _GNU_SOURCE
 
 // set to 0 when done debugging program
 #define TEST 1
@@ -39,6 +44,19 @@ char **getPort(int argc, char *argv[])
 	fprintf(stderr, "[DEBUG] Server: %s\tPort: %d\n", server_addr[0], atoi(server_addr[1]));
 #endif
 	return server_addr;
+}
+
+char *getHost()
+{
+    struct ifaddrs *ifaddr, *ifaddrPtr;
+    int family, s;
+    char *host = NULL;
+    host = (char *)calloc(NI_MAXHOST, sizeof(char));
+    if(getifaddrs(&ifaddr) == -1)
+    {
+
+    }
+    return host;
 }
 
 // creates endpoint for network communication on listening port
@@ -66,6 +84,9 @@ int createSocket(int argc, char *argv[])
 		close(sockfd);
 		exit(1);
 	}
+    // listen on port
+    listen(sockfd, 1);
+    fprintf(stderr, "[ftserver] Server listening on\n");
 	return sockfd;
 }
 
@@ -91,9 +112,8 @@ char *readCommand(int newsockfd)
 // server ends only after SIGINT
 void runServer(int argc, char *argv[])
 {
+    // create socket and listen
 	int sockfd = createSocket(argc, argv);
-	// allow network access on listening port
-	listen(sockfd, 1);
 	int newsockfd;
 	struct sockaddr_in cli_addr;
 	socklen_t clilen;
