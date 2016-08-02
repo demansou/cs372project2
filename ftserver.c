@@ -11,6 +11,7 @@
  * 		new connections until terminated by SIGINT.
  **************************************************************************************/
 
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/socket.h> // for socklen_t
@@ -19,9 +20,9 @@
 #include <unistd.h> // for read(), write(), and close()
 #include <strings.h> // for bzero() (legacy BSD functions)
 #include <ifaddrs.h> // for getifaddrs()
-
-// get definitions of NI_MAXSERV and NI_MAXHOST
-#define _GNU_SOURCE
+#include <string.h>
+#include <netdb.h>
+#include <arpa/inet.h>
 
 // set to 0 when done debugging program
 #define TEST 1
@@ -46,17 +47,17 @@ char **getPort(int argc, char *argv[])
 	return server_addr;
 }
 
-char *getHost()
+// code sourced from web archive of:
+// http://guy-lecky-thompson.suite101.com/socket-programming-gethostbyname-a19557
+void getHost(char *server_addr)
 {
-    struct ifaddrs *ifaddr, *ifaddrPtr;
-    int family, s;
-    char *host = NULL;
-    host = (char *)calloc(NI_MAXHOST, sizeof(char));
-    if(getifaddrs(&ifaddr) == -1)
-    {
-
-    }
-    return host;
+    char hostname[255];
+    gethostname(hostname, 255);
+    struct hostent *host_entry;
+    host_entry = gethostbyname(hostname);
+    char *localip;
+    localip = inet_ntoa(*(struct in_addr *)*host_entry->h_addr_list);
+    fprintf(stderr, "[ftserver] Server listening at: %s:%d\n", localip, atoi(server_addr));
 }
 
 // creates endpoint for network communication on listening port
@@ -86,7 +87,7 @@ int createSocket(int argc, char *argv[])
 	}
     // listen on port
     listen(sockfd, 1);
-    fprintf(stderr, "[ftserver] Server listening on\n");
+    getHost(server_addr[1]);
 	return sockfd;
 }
 
