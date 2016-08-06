@@ -17,7 +17,7 @@
 #include <sys/socket.h> // for socklen_t
 #include <sys/types.h> // for size_t, getifaddrs()
 #include <netinet/in.h> // for struct sockaddr_in
-#include <unistd.h> // for read(), write(), and close()
+#include <unistd.h> // for read(), write(), and close(), and access()
 #include <strings.h> // for bzero() (legacy BSD functions)
 #include <ifaddrs.h> // for getifaddrs()
 #include <string.h> // for strcpy()
@@ -26,7 +26,7 @@
 #include <dirent.h> // for struct dirent and use of directory commands
 
 // set to 0 when done debugging program
-#define TEST 1
+#define TEST 0
 
 // code sourced form web archive of:
 // http://guy-lecky-thompson.suite101.com/socket-programming-gethostbyname-a19557
@@ -56,9 +56,7 @@ char **getPort(int argc, char *argv[])
 	server_addr = (char **)calloc((size_t)2, sizeof(char *));
 	server_addr[0] = getHost();
 	server_addr[1] = argv[1];
-#if TEST
-	fprintf(stderr, "[DEBUG] Server: %s\tPort: %d\n", server_addr[0], atoi(server_addr[1]));
-#endif
+	fprintf(stderr, "Server: %s\tPort: %d\n", server_addr[0], atoi(server_addr[1]));
 	return server_addr;
 }
 
@@ -151,35 +149,43 @@ int getfilelength(FILE *fp)
 
 // taken from cs344 project 4 (key-based encryption)
 // gets contents of text file and returns contents as string
+// using idea for access gained from post on stackoverflow
+// http://stackoverflow.com/questions/230062/whats-the-best-way-to-check-if-a-file-exists-in-c-cross-platform
+// post by Graeme Perrow
 char *getFileContents(char *filename)
 {
-    FILE *fp = NULL;
-    char *filecontents = NULL;
-    int filelength = -1;
-    fp = fopen(filename, "r");
-    if(fp == NULL)
+    if(access(filename, F_OK) != -1)
     {
-        fprintf(stderr, "[ftserver] ERROR! unable to open file for sending\n");
+        FILE *fp = NULL;
+        char *filecontents = NULL;
+        int filelength = -1;
+        fp = fopen(filename, "r");
+        if(fp == NULL)
+        {
+            fprintf(stderr, "[ftserver] ERROR! unable to open file for sending\n");
+            return NULL;
+        }
+        filelength = getfilelength(fp);
+        if(filelength <= 0)
+        {
+            fprintf(stderr, "[ftserver] ERROR! no text found in file for sending\n");
+            return NULL;
+        }
+        filecontents = (char *)calloc((size_t)filelength, sizeof(char));
+        if(filecontents == NULL)
+        {
+            fprintf(stderr, "[ftserver] ERROR! unable to allocate memory for storing text\n");
+            fclose(fp);
+            return NULL;
+        }
+        fread(filecontents, 1, filelength, fp);
         fclose(fp);
+        return filecontents;
+    }
+    else
+    {
         return NULL;
     }
-    filelength = getfilelength(fp);
-    if(filelength <= 0)
-    {
-        fprintf(stderr, "[ftserver] ERROR! no text found in file for sending\n");
-        fclose(fp);
-        return NULL;
-    }
-    filecontents = (char *)calloc((size_t)filelength, sizeof(char));
-    if(filecontents == NULL)
-    {
-        fprintf(stderr, "[ftserver] ERROR! unable to allocate memory for storing text\n");
-        fclose(fp);
-        return NULL;
-    }
-    fread(filecontents, 1, filelength, fp);
-    fclose(fp);
-    return filecontents;
 }
 
 // reads incoming data from client up to 128 bytes of data
@@ -201,6 +207,7 @@ int readCommands(int newsockfd)
     // if command received is '-l', respond to client with '-l'
     if(strcmp(clientCommand, "-l") == 0)
     {
+        printf("Directory requested from client...\n");
         if(write(newsockfd, "-l", (size_t)2) <= 0)
         {
             fprintf(stderr, "[ftserver] ERROR! did not respond to client command request\n");
@@ -211,6 +218,7 @@ int readCommands(int newsockfd)
     // if command received is '-g', respond to client with '-g'
     else if(strcmp(clientCommand, "-g") == 0)
     {
+        printf("File transfer requested from client...\n");
         if(write(newsockfd, "-g", (size_t)2) <= 0)
         {
             fprintf(stderr, "[ftserver] ERROR! did not respond to client command request\n");
@@ -321,20 +329,34 @@ void sendFile(int newsockfd)
     // get and send file contents
     char *fileContents = NULL;
     fileContents = getFileContents(clientFileRequest);
-#if TEST
-    fprintf(stderr, "%s\n", fileContents);
-#endif
-    size_t fileContentsLength = strlen(fileContents);
-#if TEST
-    fprintf(stderr, "%d\n", (int)fileContentsLength);
-#endif
-    if(write(newsockfd, fileContents, fileContentsLength) <= 0)
+    if(fileContents == NULL)
     {
-        fprintf(stderr, "[ftserver] ERROR! did not send file to client\n");
-        free(fileContents);
-        return;
+        printf("File not found. Sending error message to client...\n");
+        char *errmsg = "Server says FILE NOT FOUND";
+        size_t errmsgLength = strlen(errmsg);
+        if(write(newsockfd, errmsg, errmsgLength) <= 0)
+        {
+            fprintf(stderr, "[ftserver] ERROR! did not send error message to client\n");
+        }
     }
-    free(fileContents);
+    else
+    {
+        printf("Sending requested file to client...\n");
+#if TEST
+        fprintf(stderr, "%s\n", fileContents);
+#endif
+        size_t fileContentsLength = strlen(fileContents);
+#if TEST
+        fprintf(stderr, "%d\n", (int)fileContentsLength);
+#endif
+        if(write(newsockfd, fileContents, fileContentsLength) <= 0)
+        {
+            fprintf(stderr, "[ftserver] ERROR! did not send file to client\n");
+            free(fileContents);
+            return;
+        }
+        free(fileContents);
+    }
     return;
 }
 
@@ -353,7 +375,7 @@ void runServer(int argc, char *argv[])
 	int procedure;
 	while(1)
 	{
-		fprintf(stderr, "[ftserver] Waiting for connection from client...\n");
+		printf("Waiting for connection from client...\n");
 		// open new data connection with incoming client connection request
 		newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
 		// if failure to accept incoming client connection request, close connection and listen
@@ -363,12 +385,13 @@ void runServer(int argc, char *argv[])
 			close(newsockfd);
 			continue;
 		}
-        fprintf(stderr, "[ftserver] Accepted connection from client\n");
+        printf("Accepted connection from client...\n");
 		// read command sent from client
         procedure = readCommands(newsockfd);
         // if command received is to return a list, runs function to return list
         if(procedure == 0)
         {
+            printf("Sending directory list to client...\n");
             sendList(newsockfd);
         }
         // otherwise, if command received is to return a file, runs function to return file
@@ -376,7 +399,7 @@ void runServer(int argc, char *argv[])
         {
             sendFile(newsockfd);
         }
-		fprintf(stderr, "[ftserver] Closing connection from client...\n");
+		printf("Closing connection from client...\n");
 		// close data connection
 		close(newsockfd);
 	}

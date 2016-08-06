@@ -10,7 +10,8 @@ import socket	# to access socket functionality
 import re       # to use regex
 import os       # to use path functionality
 
-TEST = True
+#TEST = True
+TEST = False
 
 def getServerAddr():
     """
@@ -145,9 +146,14 @@ def getResponse(sock, ft_command, ft_filename, ft_dataport):
             filedata += part
         if TEST:
             print >> sys.stderr, "%s" % filedata
-        textfile = open(ft_filename, "w")
-        textfile.write("%s\n" % filedata)
-        textfile.close()
+        if "Server says FILE NOT FOUND" not in filedata:
+            print("Receiving file from server...")
+            textfile = open(ft_filename, "w")
+            textfile.write("%s" % filedata)
+            textfile.close()
+            print("File transfer complete...")
+        else:
+            print("%s" % filedata)
     return
 
 
