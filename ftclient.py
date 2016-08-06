@@ -10,7 +10,7 @@ import socket	# to access socket functionality
 import re       # to use regex
 import os       # to use path functionality
 
-#TEST = True
+# TEST = True
 TEST = False
 
 def getServerAddr():
@@ -128,22 +128,24 @@ def getResponse(sock, ft_command, ft_filename, ft_dataport):
         myip = sock.recv(16)
         if TEST:
             print >> sys.stderr, "[DEBUG] ip received: %s" % myip
-        """
+
+        if TEST:
+            print >> sys.stderr, "[DEBUG] (START LISTENING HERE)"
         sock2 = createServer(socket.gethostbyname(socket.gethostname()), ft_dataport)
         sock2.listen(1)
-        print >> sys.stderr, "[ftclient] listening on: %s:%s" % (socket.gethostbyname(socket.gethostname()), ft_dataport)
-        while True:
-            try:
-                client_connection, client_address = sock2.accept()
-            except:
-                print >> sys.stderr, "[ftclient] ERROR! could not receive incoming connection"
-            print >> sys.stderr, "[ftclient] connected to %s" % client_address
-        """
+        sock.send(ft_dataport)
+        if TEST:
+           print >> sys.stderr, "[ftclient] listening on: %s:%s" % (socket.gethostbyname(socket.gethostname()), ft_dataport)
+        client_connection, client_address = sock2.accept()
+        if TEST:
+            print >> sys.stderr, "connected to: %s %s" % (client_address[0], client_address[1])
         filedata = ""
         part = None
         while part != "":
-            part = sock.recv(1024)
+            part = client_connection.recv(64)
             filedata += part
+            if TEST:
+                print >> sys.stderr, "reached end of while loop"
         if TEST:
             print >> sys.stderr, "%s" % filedata
         if "Server says FILE NOT FOUND" not in filedata:

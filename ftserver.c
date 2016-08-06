@@ -106,6 +106,7 @@ int createSocket(int argc, char *argv[])
 	return sockfd;
 }
 
+// taken from cs344 project 4 (key-based encryption)
 // connects to socket server
 int socketConnect(char **connection_address)
 {
@@ -126,7 +127,7 @@ int socketConnect(char **connection_address)
     {
         fprintf(stderr, "[chatclient] ERROR! connecting to server port %s:%s\n", connection_address[0], connection_address[1]);
         close(ftsockfd);
-        exit(1);
+        return -1;
     }
     return ftsockfd;
 }
@@ -149,11 +150,15 @@ int getfilelength(FILE *fp)
 
 // taken from cs344 project 4 (key-based encryption)
 // gets contents of text file and returns contents as string
+// if there is no file or if an error opening file or getting file contents happens,
+// returns a null to catch error rather than having a memory error
 // using idea for access gained from post on stackoverflow
 // http://stackoverflow.com/questions/230062/whats-the-best-way-to-check-if-a-file-exists-in-c-cross-platform
 // post by Graeme Perrow
 char *getFileContents(char *filename)
 {
+    // access checks that the file exists before attempting to open file through program which would cause
+    // a memory error and a program crash
     if(access(filename, F_OK) != -1)
     {
         FILE *fp = NULL;
@@ -168,7 +173,6 @@ char *getFileContents(char *filename)
         filelength = getfilelength(fp);
         if(filelength <= 0)
         {
-            fprintf(stderr, "[ftserver] ERROR! no text found in file for sending\n");
             return NULL;
         }
         filecontents = (char *)calloc((size_t)filelength, sizeof(char));
@@ -273,9 +277,11 @@ void sendFile(int newsockfd)
     char clientFileRequest[64];
     char clientDataPort[6];
     char clientHostname[16];
+    char clientDataPort2[6];
     bzero(&clientFileRequest, (size_t)64);
     bzero(&clientDataPort, (size_t)6);
     bzero(&clientHostname, (size_t)16);
+    bzero(&clientDataPort2, (size_t)6);
     // read file request from client
     if(read(newsockfd, &clientFileRequest, (size_t)64) <= 0)
     {
@@ -321,11 +327,28 @@ void sendFile(int newsockfd)
         fprintf(stderr, "[ftserver] ERROR! did not resond to client host name\n");
         return;
     }
-    /*
+#if TEST
+    fprintf(stderr, "[DEBUG] (TCP DATA CONNECTION CONNECTS HERE)\n");
+#endif
     strtok(clientHostname, "\0");
     char **connection_address = connectionAddress(clientHostname, clientDataPort);
+    if(read(newsockfd, &clientDataPort2, (size_t)6) <= 0)
+    {
+        fprintf(stderr, "[ftserver] ERROR! did not receive client server listening notification\n");
+        return;
+    }
+    if(strcmp(clientDataPort, clientDataPort2) != 0)
+    {
+        fprintf(stderr, "[ftserver] ERROR %s != %s\n", clientDataPort, clientDataPort2);
+        return;
+    }
     int ftsockfd = socketConnect(connection_address);
-    */
+#if TEST
+    fprintf(stderr, "[DEBUG] clientHostname %s strlen %d clientDataPort %s strlen %d\n", clientHostname, strlen(clientHostname), clientDataPort, strlen(clientDataPort));
+    fprintf(stderr, "[DEBUG] newsockfd %d ftsockfd %d\n", newsockfd, ftsockfd);
+    fprintf(stderr, "[DEBUG] %s == %s\n", clientDataPort, clientDataPort2);
+    fprintf(stderr, "[DEBUG] (TCP DATA CONNECTION CONNECTED HERE)\n");
+#endif
     // get and send file contents
     char *fileContents = NULL;
     fileContents = getFileContents(clientFileRequest);
@@ -334,7 +357,7 @@ void sendFile(int newsockfd)
         printf("File not found. Sending error message to client...\n");
         char *errmsg = "Server says FILE NOT FOUND";
         size_t errmsgLength = strlen(errmsg);
-        if(write(newsockfd, errmsg, errmsgLength) <= 0)
+        if(write(ftsockfd, errmsg, errmsgLength) <= 0)
         {
             fprintf(stderr, "[ftserver] ERROR! did not send error message to client\n");
         }
@@ -349,14 +372,17 @@ void sendFile(int newsockfd)
 #if TEST
         fprintf(stderr, "%d\n", (int)fileContentsLength);
 #endif
-        if(write(newsockfd, fileContents, fileContentsLength) <= 0)
+        if(write(ftsockfd, fileContents, fileContentsLength) < 0)
+//        if(write(newsockfd, fileContents, fileContentsLength) <= 0)
         {
             fprintf(stderr, "[ftserver] ERROR! did not send file to client\n");
             free(fileContents);
             return;
         }
+        close(ftsockfd);
         free(fileContents);
     }
+    close(ftsockfd);
     return;
 }
 
