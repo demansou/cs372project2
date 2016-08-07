@@ -2,7 +2,12 @@
 Author: Daniel Mansour
 Creation Date: 08-01-2016
 File Name: ftclient.py
-Description:
+Description: ftclient takes a command line argument in the format
+             'python ftclient.py [server ip] [server port] [command] [filename <only if using -g>] [data port]'
+             server ip is ip of server to connect to
+             server port is access port to communicate with server
+             command is '-l' to list text files or '-g' to get a text file if it exists
+             data port is port to return either list of text files or text file contents on specific client port
 """
 
 import sys      # to access command line args
@@ -10,8 +15,8 @@ import socket	# to access socket functionality
 import re       # to use regex
 import os       # to use path functionality
 
-TEST = True
-# TEST = False
+# TEST = True
+TEST = False
 
 def getServerAddr():
     """
@@ -76,7 +81,7 @@ def createServer(server_addr, server_port):
 
 def sendCommand(sock, ft_command, ft_dataport):
     """
-    Sends command line commands to ftserver
+    Sends command line command and data port to ftserver and establishes data connection
     """
     try:
         sock.send(ft_command)
@@ -111,26 +116,6 @@ def sendCommand(sock, ft_command, ft_dataport):
         client_connection, client_address = sock2.accept()
         if TEST:
             print >> sys.stderr, "connected to %s %s" % (client_address[0], client_address[1])
-
-    """
-    if ft_command == "-g" and "-g" in data:
-        try:
-            sock.send(ft_filename)
-        except:
-            print >> sys.stderr, "[ftclient] ERROR! Did not send filename to server"
-            sys.exit(1)
-        data = sock.recv(64)
-        if TEST:
-            print >> sys.stderr, "[DEBUG] data received: %s" % data
-        try:
-            sock.send(ft_dataport)
-        except:
-            print >> sys.stderr, "[ftclient] ERROR! Did not send dataport to server"
-            sys.exit(1)
-        data = sock.recv(64)
-        if TEST:
-            print >> sys.stderr, "[DEBUG] data received: %s" % data
-    """
     return client_connection
 
 
@@ -157,25 +142,14 @@ def getResponse(client_connection, ft_command, ft_filename):
             if "endlist" not in item:
                 print("%s" % item)
     elif ft_command == "-g":
-        """
-        sock.send(socket.gethostbyname(socket.gethostname()))
-        myip = sock.recv(16)
+        try:
+            client_connection.send(ft_filename)
+        except:
+            print >> sys.stderr, "[ftclient] ERROR! did not send filename to server"
         if TEST:
-            print >> sys.stderr, "[DEBUG] ip received: %s" % myip
-
-        if TEST:
-            print >> sys.stderr, "[DEBUG] (START LISTENING HERE)"
-        sock2 = createServer(socket.gethostbyname(socket.gethostname()), ft_dataport)
-        sock2.listen(1)
-        sock.send(ft_dataport)
-        if TEST:
-           print >> sys.stderr, "[ftclient] listening on: %s:%s" % (socket.gethostbyname(socket.gethostname()), ft_dataport)
-        client_connection, client_address = sock2.accept()
-        if TEST:
-            print >> sys.stderr, "connected to: %s %s" % (client_address[0], client_address[1])
-        """
-        filedata = ""
+            fprintf >> sys.stderr, "[DEBUG] file to send: %s" % data
         part = None
+        filedata = ""
         while part != "":
             part = client_connection.recv(64)
             filedata += part
@@ -196,7 +170,12 @@ def getResponse(client_connection, ft_command, ft_filename):
 
 def runServer():
     """
-
+    gathers server ip and port from command line
+    gathers '-l' or '-g' and data port
+    if '-g', gathers filename
+    sends command '-l' or '-g' to server along with data port
+    if '-g', sends filename to server
+    receives response from server based on sent data
     """
     server_addr, server_port = getServerAddr()
     ft_command, ft_filename, ft_dataport = getFTCommands()

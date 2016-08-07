@@ -26,7 +26,7 @@
 #include <dirent.h> // for struct dirent and use of directory commands
 
 // set to 0 when done debugging program
-#define TEST 1
+#define TEST 0
 
 // code sourced form web archive of:
 // http://guy-lecky-thompson.suite101.com/socket-programming-gethostbyname-a19557
@@ -171,7 +171,7 @@ char *getFileContents(char *filename)
             return NULL;
         }
         filelength = getfilelength(fp);
-        if(filelength <= 0)
+        if(filelength < 0)
         {
             return NULL;
         }
@@ -240,7 +240,7 @@ int readCommands(int newsockfd)
 
 // sends list of files currently in directory across socket connection
 // up to 10 files
-void sendList(int newsockfd)
+void sendList(int ftsockfd)
 {
     DIR *dirp = NULL;
     struct dirent *ptr = NULL;
@@ -249,12 +249,12 @@ void sendList(int newsockfd)
     {
         if(strstr(ptr->d_name, ".txt") != NULL)
         {
-            if(write(newsockfd, ptr->d_name, (size_t)strlen(ptr->d_name)) <= 0)
+            if(write(ftsockfd, ptr->d_name, (size_t)strlen(ptr->d_name)) <= 0)
             {
                 fprintf(stderr, "[ftserver] ERROR! did not write filename to client\n");
                 return;
             }
-            if(read(newsockfd, ptr->d_name, (size_t)strlen(ptr->d_name)) <= 0)
+            if(read(ftsockfd, ptr->d_name, (size_t)strlen(ptr->d_name)) <= 0)
             {
                 fprintf(stderr, "[ftserver] ERROR! did not read filename response from client\n");
             }
@@ -263,7 +263,7 @@ void sendList(int newsockfd)
 #endif
         }
     }
-    if(write(newsockfd, "endlist", (size_t)8) <= 0)
+    if(write(ftsockfd, "endlist", (size_t)8) <= 0)
     {
         fprintf(stderr, "[ftserver] did not successfully send end of text file list\n");
     }
@@ -274,14 +274,7 @@ void sendList(int newsockfd)
 void sendFile(int ftsockfd)
 {
     char clientFileRequest[64];
-    // char clientDataPort[6];
-    // char clientHostname[16];
-    // char clientDataPort2[6];
     bzero(&clientFileRequest, (size_t)64);
-    // bzero(&clientDataPort, (size_t)6);
-    // bzero(&clientHostname, (size_t)16);
-    // bzero(&clientDataPort2, (size_t)6);
-    // read file request from client
     if(read(ftsockfd, &clientFileRequest, (size_t)64) <= 0)
     {
         fprintf(stderr, "[ftserver] ERROR! did not receive client file request\n");
@@ -290,65 +283,13 @@ void sendFile(int ftsockfd)
 #if TEST
     fprintf(stderr, "[DEBUG] received file request: %s\n", clientFileRequest);
 #endif
+    /*
     // respond to client with file request
     if(write(ftsockfd, &clientFileRequest, (size_t)64) <= 0)
     {
         fprintf(stderr, "[ftserver] ERROR! did not respond to client file request\n");
         return;
     }
-    /*
-    // read client data port from client
-    if(read(newsockfd, &clientDataPort, (size_t)6) <= 0)
-    {
-        fprintf(stderr, "[ftserver] ERROR! did not receive client data port request\n");
-        return;
-    }
-#if TEST
-    fprintf(stderr, "[DEBUG] received data port request: %s\n", clientDataPort);
-#endif
-    // respond to client with data port
-    if(write(newsockfd, &clientDataPort, (size_t)6) <= 0)
-    {
-        fprintf(stderr, "[ftserver] ERROR! did not respond to client data port request\n");
-        return;
-    }
-    // read client ip from client
-    if(read(newsockfd, &clientHostname, (size_t)16) <= 0)
-    {
-        fprintf(stderr, "[ftserver] ERROR! did not receive client host name\n");
-        return;
-    }
-#if TEST
-    fprintf(stderr, "[DEBUG] received client hostname: %s\n", clientHostname);
-#endif
-    // respond to client with host name
-    if(write(newsockfd, &clientHostname, (size_t)16) <= 0)
-    {
-        fprintf(stderr, "[ftserver] ERROR! did not resond to client host name\n");
-        return;
-    }
-#if TEST
-    fprintf(stderr, "[DEBUG] (TCP DATA CONNECTION CONNECTS HERE)\n");
-#endif
-    strtok(clientHostname, "\0");
-    char **connection_address = connectionAddress(clientHostname, clientDataPort);
-    if(read(newsockfd, &clientDataPort2, (size_t)6) <= 0)
-    {
-        fprintf(stderr, "[ftserver] ERROR! did not receive client server listening notification\n");
-        return;
-    }
-    if(strcmp(clientDataPort, clientDataPort2) != 0)
-    {
-        fprintf(stderr, "[ftserver] ERROR %s != %s\n", clientDataPort, clientDataPort2);
-        return;
-    }
-    int ftsockfd = socketConnect(connection_address);
-#if TEST
-    fprintf(stderr, "[DEBUG] clientHostname %s strlen %d clientDataPort %s strlen %d\n", clientHostname, strlen(clientHostname), clientDataPort, strlen(clientDataPort));
-    fprintf(stderr, "[DEBUG] newsockfd %d ftsockfd %d\n", newsockfd, ftsockfd);
-    fprintf(stderr, "[DEBUG] %s == %s\n", clientDataPort, clientDataPort2);
-    fprintf(stderr, "[DEBUG] (TCP DATA CONNECTION CONNECTED HERE)\n");
-#endif
     */
     // get and send file contents
     char *fileContents = NULL;
@@ -374,7 +315,6 @@ void sendFile(int ftsockfd)
         fprintf(stderr, "%d\n", (int)fileContentsLength);
 #endif
         if(write(ftsockfd, fileContents, fileContentsLength) < 0)
-//        if(write(newsockfd, fileContents, fileContentsLength) <= 0)
         {
             fprintf(stderr, "[ftserver] ERROR! did not send file to client\n");
             free(fileContents);
